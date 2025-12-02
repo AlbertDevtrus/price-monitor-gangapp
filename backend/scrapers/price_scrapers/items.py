@@ -1,12 +1,13 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
-import scrapy
+from datetime import datetime
+from typing import Literal
+from pydantic import BaseModel, Field, HttpUrl
 
 
-class PriceScrapersItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+class ProductScraped(BaseModel):
+    title: str
+    price: float = Field(gt=0, description="Price is more than 0")
+    image: str | None = None
+    platform: str
+    currency: Literal["MXN", "USD"]
+    link: HttpUrl
+    scraped_at: datetime = Field(default_factory=datetime.now)
