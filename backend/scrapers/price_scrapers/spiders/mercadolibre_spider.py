@@ -1,53 +1,34 @@
-import scrapy
-from price_scrapers.items import ProductScraped
-from pydantic import ValidationError
+from price_scrapers.base_spiders import BaseMarketplaceSpider
 
-class MercadoLibreSpider(scrapy.Spider):
-    name = "mercadolibre"
+
+class MercadoLibreSpider(BaseMarketplaceSpider):
+    name = "mercadolibre" 
     allowed_domains = ["mercadolibre.com.mx"]
-    
-    def __init__(self, search_query="", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.search_query = search_query
-        
+    platform_name = "Mercado Libre"
+    currency = "MXN"
 
-    def start_requests(self):
-        max_pages = 3
-        
-        for page in range(1, max_pages + 1):
-            if page == 1:
-                url= f"https://listado.mercadolibre.com.mx/{self.search_query}"
-            else:
-                offset = (page - 1) * 50 + 1
-                url= f"https://listado.mercadolibre.com.mx/{self.search_query}_Desde_{offset}"
-        
-            yield scrapy.Request(url=url, callback=self.parse)
+    def get_product_container(self, response):
+        return response.css('li.ui-search-layout__item')
+
+    def extract_title(self, product):
+        return product.css('a.poly-component__title::text').get()
+
+
+    def extract_price(self, product):
+        return product.css('.andes-money-amount__fraction::text').get()
+
+    def extract_link(self, product):
+        return product.css('a.poly-component__title::attr(href)').get()
 
     
-    def parse(self, response):
-        products = response.css('li.ui-search-layout__item')
-        self.logger.info(f"Encontrados {len(products)} productos")
+    def extract_image(self, product):
+        return product.css('img.poly-component__picture::attr(src)').get()
+    
+    def build_page_url(self, page_number):
+        if page_number == 1:
+            url= f"https://listado.mercadolibre.com.mx/{self.search_query}"
+        else:
+            offset = (page_number - 1) * 50 + 1
+            url= f"https://listado.mercadolibre.com.mx/{self.search_query}_Desde_{offset}"
         
-        for product in products:
-            title_element = product.css('a.poly-component__title')
-            title = title_element.css('::text').get()
-            
-            link = title_element.css('::attr(href)').get()
-
-            image_element = product.css('img.poly-component__picture')
-            image = image_element.css('::attr(src)').get()
-            
-            price = product.css('.andes-money-amount__fraction::text').get()
-
-            if not price or not link or not title: 
-                self.logger.warning(f"Invalid product: price: {price}, link: {link}, title: {title}")
-                continue
-
-            try: 
-                product_scraped = ProductScraped(**{"title": title, "price": float(price.replace(',','')), "image": image, "platform": 'Mercado Libre', "currency": "MXN", "link": link })
-            
-                yield product_scraped.model_dump(mode="json")
-            except ValidationError as e:
-                self.logger.warning(f"Invalid Product: {e}")
-                self.logger.debug(f"Data: title: {title}, price: {price}, image: {image}, platform: Mercado Libre, currency: MXN, link: {link} ")
-                continue
+        return url
