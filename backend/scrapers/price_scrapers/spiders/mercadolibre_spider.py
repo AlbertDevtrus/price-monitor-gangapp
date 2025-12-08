@@ -8,9 +8,21 @@ class MercadoLibreSpider(scrapy.Spider):
     
     def __init__(self, search_query="", *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.start_urls = [
-            f"https://listado.mercadolibre.com.mx/{search_query}"
-        ]
+        self.search_query = search_query
+        
+
+    def start_requests(self):
+        max_pages = 3
+        
+        for page in range(1, max_pages + 1):
+            if page == 1:
+                url= f"https://listado.mercadolibre.com.mx/{self.search_query}"
+            else:
+                offset = (page - 1) * 50 + 1
+                url= f"https://listado.mercadolibre.com.mx/{self.search_query}_Desde_{offset}"
+        
+            yield scrapy.Request(url=url, callback=self.parse)
+
     
     def parse(self, response):
         products = response.css('li.ui-search-layout__item')
@@ -34,7 +46,7 @@ class MercadoLibreSpider(scrapy.Spider):
             try: 
                 product_scraped = ProductScraped(**{"title": title, "price": float(price.replace(',','')), "image": image, "platform": 'Mercado Libre', "currency": "MXN", "link": link })
             
-                yield product_scraped
+                yield product_scraped.model_dump(mode="json")
             except ValidationError as e:
                 self.logger.warning(f"Invalid Product: {e}")
                 self.logger.debug(f"Data: title: {title}, price: {price}, image: {image}, platform: Mercado Libre, currency: MXN, link: {link} ")
