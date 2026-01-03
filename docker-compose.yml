@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: price_monitor_db
+    environment:
+      POSTGRES_USER: priceuser
+      POSTGRES_PASSWORD: pricepass
+      POSTGRES_DB: price_monitor
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - price_monitor_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: price_monitor_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pricemonitor.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - price_monitor_network
+
+volumes:
+  postgres_data:
+
+networks:
+  price_monitor_network:
+    driver: bridge
