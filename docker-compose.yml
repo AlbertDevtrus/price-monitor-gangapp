@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -12,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - price_monitor_network
 
@@ -30,6 +29,7 @@ services:
 
 volumes:
   postgres_data:
+  pgadmin_data:
 
 networks:
   price_monitor_network:
