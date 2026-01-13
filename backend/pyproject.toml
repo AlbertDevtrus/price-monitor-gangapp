@@ -13,3 +13,18 @@ dependencies = [
     "scrapy>=2.13.4",
     "sqlalchemy>=2.0.44",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=25.12.0",
+    "ruff>=0.14.10",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
+ignore = []
