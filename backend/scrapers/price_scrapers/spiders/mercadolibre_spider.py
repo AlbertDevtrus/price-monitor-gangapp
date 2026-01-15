@@ -43,6 +43,6 @@ class MercadoLibreSpider(BaseMarketplaceSpider):
             url = f"https://listado.mercadolibre.com.mx/{self.search_query}"
         else:
             offset = (page_number - 1) * 50 + 1
-            url = f"https://listado.mercadolibre.com.mx/{self.search_query}_Desde_{offset}"
+            url = f"https://listado.mercadolibre.com.mx/{self.search_query}_Desde_{offset}_NoIndex_True"
 
         return url
