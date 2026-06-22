@@ -46,6 +46,10 @@ class BaseMarketplaceSpider(scrapy.Spider, ABC):
         """ Build page URL for pagination """
         pass
 
+    def extract_location(self, product):
+        """Extracts product location (optional, for local/C2C listings)."""
+        return None
+
     def clean_price(self, price_str):
         return price_str.replace(',', '').strip()
     
@@ -65,23 +69,25 @@ class BaseMarketplaceSpider(scrapy.Spider, ABC):
             
             price = self.extract_price(product=product)
 
-            item = self._validate_and_create_item(image=image,title=title,price=price,link=link)
+            location = self.extract_location(product=product)
+
+            item = self._validate_and_create_item(image=image,title=title,price=price,link=link,location=location)
 
             if item:
                 yield item
 
 
-    def _validate_and_create_item(self, title, price, link, image):
+    def _validate_and_create_item(self, title, price, link, image, location=None):
         """Validate data and create ProductScraped"""
 
-        if not price or not link or not title: 
+        if not price or not link or not title:
             self.logger.warning(f"Invalid product: price: {price}, link: {link}, title: {title}")
             return None
-        
+
         price=float(self.clean_price(price))
-        
-        try: 
-            product_scraped = ProductScraped(**{"title": title, "price": price, "image": image, "platform": self.platform_name, "currency": self.currency, "link": link })
+
+        try:
+            product_scraped = ProductScraped(**{"title": title, "price": price, "image": image, "platform": self.platform_name, "currency": self.currency, "link": link, "location": location })
         
             return product_scraped.model_dump(mode="json")
         except ValidationError as e:

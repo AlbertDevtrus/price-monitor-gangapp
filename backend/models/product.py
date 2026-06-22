@@ -22,6 +22,7 @@ class Product(Base):
     available = Column(Boolean, default=True)
     rating = Column(Float, nullable=True)
     condition = Column(String, nullable=True)
+    location = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(

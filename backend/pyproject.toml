@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.17.2",
+    "apscheduler>=3.11.0",
     "brotli>=1.2.0",
+    "httpx>=0.28.1",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.4",
     "python-dotenv>=1.2.1",

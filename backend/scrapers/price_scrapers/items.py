@@ -7,6 +7,7 @@ class ProductScraped(BaseModel):
     title: str
     price: float = Field(gt=0, description="Price is more than 0")
     image: str | None = None
+    location: str | None = None
     platform: str
     currency: Literal["MXN", "USD"]
     link: HttpUrl
