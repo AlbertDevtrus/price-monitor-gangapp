@@ -58,3 +58,5 @@ htmlcov/
 # Celery
 celerybeat-schedule
 celerybeat.pid
+
+.playwright-mcp/
