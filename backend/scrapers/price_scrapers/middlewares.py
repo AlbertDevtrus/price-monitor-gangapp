@@ -3,10 +3,15 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+import asyncio
+import logging
+
 from scrapy import signals
 
 # useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class PriceScrapersSpiderMiddleware:
@@ -51,6 +56,85 @@ class PriceScrapersSpiderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
+
+
+class PlaywrightStateMiddleware:
+    """Downloader middleware that persists the Playwright browser context
+    storage state (cookies + localStorage) after each successful playwright
+    response.
+
+    The context is still alive at this point (only the *page* has been
+    closed), so calling context.storage_state() is safe.
+
+    On Windows scrapy-playwright routes all Playwright coroutines through a
+    dedicated ProactorEventLoop thread (_ThreadedLoopAdapter).  We schedule
+    the save coroutine on that loop via run_coroutine_threadsafe so we don't
+    stall the Scrapy/Twisted reactor.
+
+    Enable in settings.py:
+        DOWNLOADER_MIDDLEWARES = {
+            "price_scrapers.middlewares.PlaywrightStateMiddleware": 900,
+        }
+    """
+
+    # Per-instance set so we only save once per (context_name, path) per run.
+    def __init__(self):
+        self._saved: set = set()
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls()
+
+    def process_response(self, request, response, spider):
+        if not request.meta.get("playwright"):
+            return response
+
+        context_name = request.meta.get("playwright_context", "default")
+        state_path = getattr(spider, "playwright_state_path", None)
+        if state_path is None:
+            return response
+
+        # Only save once per context per run to avoid hammering disk.
+        key = (context_name, state_path)
+        if key in self._saved:
+            return response
+
+        try:
+            handler = (
+                spider.crawler.engine.downloader.handlers._handlers.get(
+                    "https"
+                )
+            )
+            if handler is None:
+                return response
+
+            ctx_wrapper = getattr(handler, "context_wrappers", {}).get(
+                context_name
+            )
+            if ctx_wrapper is None:
+                return response
+
+            from scrapy_playwright._utils import _ThreadedLoopAdapter  # noqa: PLC0415
+
+            pw_loop: asyncio.AbstractEventLoop = _ThreadedLoopAdapter._loop
+            future = asyncio.run_coroutine_threadsafe(
+                ctx_wrapper.context.storage_state(path=state_path),
+                pw_loop,
+            )
+            future.result(timeout=15)
+            self._saved.add(key)
+            logger.info(
+                "Playwright context '%s' state saved to %s",
+                context_name,
+                state_path,
+            )
+        except AttributeError:
+            # _ThreadedLoopAdapter._loop not available (non-Windows path).
+            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Could not save Playwright state: %s", exc)
+
+        return response
 
 
 class PriceScrapersDownloaderMiddleware:

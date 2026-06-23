@@ -39,6 +39,10 @@ Thumbs.db
 *.csv
 *.xml
 
+# Playwright persistent browser state (cookies/localStorage for anti-bot trust)
+# Directory is auto-created by settings.py; never commit session state.
+backend/scrapers/.pw_state/
+
 # Database
 *.db
 *.sqlite3

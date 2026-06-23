@@ -31,10 +31,8 @@ backend/
     ├── items.py             # ProductScraped (validación Pydantic)
     ├── pipelines.py         # DatabasePipeline: guarda precios + dispara alertas
     └── spiders/
-        ├── mercadolibre_spider.py
-        ├── craigslist_spider.py    # vía RSS
-        ├── olx_mx_spider.py        # segunda mano local
-        └── vivanuncios_spider.py   # clasificados locales
+        ├── mercadolibre_spider.py  # vía Playwright (navegador real)
+        └── craigslist_spider.py    # vía RSS
 ```
 
 **Flujo:** spider → `ProductScraped` (validado) → `DatabasePipeline` → guarda precio →
@@ -42,8 +40,9 @@ si cambió, evalúa alertas activas → si califica, envía Telegram.
 
 ## Stack
 
-Python 3.13 · Scrapy · SQLAlchemy 2.0 · PostgreSQL 16 · Pydantic · APScheduler ·
-httpx · uv (gestión de dependencias) · Docker Compose.
+Python 3.13 · Scrapy · scrapy-playwright (navegador real) · SQLAlchemy 2.0 ·
+PostgreSQL 16 · Pydantic · APScheduler · httpx · uv (gestión de dependencias) ·
+Docker Compose.
 
 ## Setup
 
@@ -79,7 +78,8 @@ TELEGRAM_DEFAULT_CHAT_ID=   # tu chat id (ver abajo)
 
 ```bash
 cd backend
-uv sync                       # instala dependencias
+uv sync                          # instala dependencias
+uv run playwright install chromium   # navegador real (necesario para Mercado Libre)
 uv run python create_tables.py   # crea las tablas
 ```
 
@@ -115,10 +115,10 @@ Anti-spam: una alerta no se vuelve a disparar dentro de las 6 horas
 
 ```bash
 cd backend/scrapers
-uv run scrapy crawl mercadolibre -a search_query=iphone
+# Mercado Libre usa navegador real; su robots.txt prohíbe los listados,
+# así que se corre con ROBOTSTXT_OBEY=False (uso personal).
+uv run scrapy crawl mercadolibre -a search_query=iphone -s ROBOTSTXT_OBEY=False
 uv run scrapy crawl craigslist  -a search_query=bicycle -a site=newyork
-uv run scrapy crawl olx_mx       -a search_query=iphone
-uv run scrapy crawl vivanuncios  -a search_query=laptop
 ```
 
 ### Automatizar (scheduler)
@@ -135,26 +135,31 @@ cd backend
 uv run --with pytest python -m pytest alerts/test_evaluator.py -q
 ```
 
-## ⚠️ Limitación importante: anti-bot
+## Anti-bot: estado y estrategia
 
-Los marketplaces objetivo **bloquean activamente el scraping** con peticiones HTTP
-simples (verificado 2026-06):
+Los marketplaces protegen sus listados contra scraping. Estado verificado (2026-06):
 
-- **Mercado Libre** → redirige a una página `account-verification`.
-- **Craigslist** → HTTP 403.
-- **OLX MX / Vivanuncios** → 403 (Cloudflare).
+- **Mercado Libre** → ✅ **funciona** con `scrapy-playwright` (navegador real Chromium).
+  Por HTTP simple redirige a `account-verification`/captcha, pero el navegador real
+  carga los listados. ML muestra un **muro de captcha intermitente**; se mitiga con:
+  contexto de navegador **persistente** (cookies que generan confianza, guardadas en
+  `backend/scrapers/.pw_state/`), opciones **anti-detección de headless** y **reintento**
+  al detectar el muro. Confiabilidad medida: ~3/3 corridas exitosas.
+- **OLX MX** → ❌ el dominio `olx.com.mx` ya **no existe** (OLX cerró en México). Spider
+  eliminado.
+- **Vivanuncios** → ⚠️ **pivoteó a solo bienes raíces**; no sirve para productos. Spider
+  eliminado.
+- **Craigslist** → ⚠️ 403 por IP de datacenter (US-céntrico). Se conserva el spider; podría
+  funcionar más adelante vía Playwright.
 
-Por eso los spiders C2C cargan pero **sus selectores CSS no están validados contra
-HTML real** y no devuelven datos todavía. La solución elegida es integrar
-**[scrapy-playwright](https://github.com/scrapy-plugins/scrapy-playwright)**
-(navegador real) — ver Roadmap.
+Si la confiabilidad de ML baja, los siguientes escalones son: modo **headful**, un plugin
+**stealth**, o **proxies residenciales** (de pago).
 
 ## Roadmap
 
-- [ ] **scrapy-playwright**: navegador real para sortear el anti-bot y revalidar
-      selectores con HTML real.
-- [ ] **Facebook Marketplace**: spider con Playwright + cuenta dedicada (sesión
-      persistida con cookies).
+- [x] **scrapy-playwright**: navegador real integrado; Mercado Libre scrapea datos reales.
+- [ ] **Facebook Marketplace**: spider con Playwright + cuenta dedicada (login manual una
+      vez, sesión persistida con cookies).
 - [ ] **Retail**: spiders de Amazon MX y Walmart MX.
 - [ ] Migrar `start_requests()` → `start()` (deprecado en Scrapy 2.13).
 - [ ] API (FastAPI) y/o frontend si se abre la app a más usuarios.

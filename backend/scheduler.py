@@ -112,6 +112,10 @@ def _crawl_worker(
     from scrapy.utils.project import get_project_settings
 
     settings = get_project_settings()
+    # Target marketplaces (e.g. Mercado Libre) forbid their listing pages in
+    # robots.txt; for this personal-use tool we disable robots obedience here so
+    # the scheduled runs behave like the manual `-s ROBOTSTXT_OBEY=False` runs.
+    settings.set("ROBOTSTXT_OBEY", False)
     process = CrawlerProcess(settings)
 
     for query in search_queries:
